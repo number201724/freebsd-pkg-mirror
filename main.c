@@ -202,6 +202,16 @@ void pkg_update( const char *name, const char *origin, const char *version, cons
 	sqlite3_exec( dbi, sql, NULL, NULL, &error );
 }
 
+void pkg_delete(const char *name)
+{
+	char sql[1024];
+	char *error;
+	int code;
+
+	sprintf( sql, "DELETE FROM package WHERE name = \"%s\"", name );
+	sqlite3_exec( dbi, sql, NULL, NULL, &error );
+}
+
 
 void addjob( const char *name, const char *origin, const char *version, const char *abi,
 			 const char *arch, const char *sum, const char *path, const char *repopath )
@@ -443,6 +453,8 @@ void process_clean_packages( void )
 	{
 		sprintf( path, "%s/%s", g_directory, pkg->path );
 		remove( path );
+
+		pkg_delete(pkg->name);
 	}
 }
 
@@ -452,7 +464,7 @@ bool dlfile( char *url, char *path )
 	int code;
 	int status;
 
-	char *argv[] = { "curl", "--create-dirs", "-o", path, url, NULL };
+	char *argv[] = { "curl", "--create-dirs", "-f", "-o", path, url, NULL };
 	char *env[] = { NULL };
 
 	code = posix_spawnp( &pid, "curl", NULL, NULL, argv, env );
@@ -463,7 +475,6 @@ bool dlfile( char *url, char *path )
 
 		if( status == 0 )
 			return true;
-
 	}
 
 	return false;
@@ -656,7 +667,15 @@ void download_packagesite(void)
 	if(!dlfile(url, path))
 	{
 		printf("download meta.conf failed\n");
-		exit(-1);
+		// exit(-1);
+	}
+
+	sprintf(url, "%s/%s/%s/digests.txz", g_baseurl, g_abi, g_channel);
+	sprintf(path, "%s/digests.txz", g_directory);
+	if(!dlfile(url, path))
+	{
+		printf("download digests.txz failed\n");
+		// exit(-1);
 	}
 
 	sprintf(url, "%s/%s/%s/meta.txz", g_baseurl, g_abi, g_channel);
@@ -664,6 +683,29 @@ void download_packagesite(void)
 	if(!dlfile(url, path))
 	{
 		printf("download meta.txz failed\n");
+		exit(-1);
+	}
+
+	sprintf(url, "%s/%s/%s/Latest/pkg.txz", g_baseurl, g_abi, g_channel);
+	sprintf(path, "%s/Latest/pkg.txz", g_directory);
+	if(!dlfile(url, path))
+	{
+		printf("download Latest/pkg.txz failed\n");
+		exit(-1);
+	}
+	sprintf(url, "%s/%s/%s/Latest/pkg.txz.sig", g_baseurl, g_abi, g_channel);
+	sprintf(path, "%s/Latest/pkg.txz.sig", g_directory);
+	if(!dlfile(url, path))
+	{
+		printf("download Latest/pkg.txz.sig failed\n");
+		exit(-1);
+	}
+
+	sprintf(url, "%s/%s/%s/Latest/pkg-devel.txz", g_baseurl, g_abi, g_channel);
+	sprintf(path, "%s/Latest/pkg-devel.txz", g_directory);
+	if(!dlfile(url, path))
+	{
+		printf("download Latest/pkg-devel.txz failed\n");
 		exit(-1);
 	}
 
