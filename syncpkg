@@ -1,0 +1,71 @@
+#!/bin/sh
+
+script_pkg="/data/pkg-mirror"
+nginx_conf_dir="/usr/local/etc/nginx/server/pkg"
+fetchpkglog="/var/log/pkg_fetch.log"
+datasize=""
+
+sync_pkg(){
+	
+	dirs=`ls $script_pkg/upda*`
+	
+	for d in $dirs ;do
+		sudo -u www $d
+	done
+
+	wait
+}
+
+
+snap_and_chang_nginx(){
+
+	# if prive process is not done, then wait
+
+	let "proccess=`ps aux | grep pkg-mirror | wc -l` - 1" > /dev/null
+
+	while $proccess ;do
+		sleep 10
+		let "proccess=`ps aux | grep pkg-mirror | wc -l` - 1" > /dev/null
+	done
+
+
+	# if prive process is un-normal terminated, then redo it
+
+	if [ -d "/data/pkg/.zfs/snapshot/pkg" ];then
+		zfs destroy -f data/pkg@pkg
+	fi
+
+	zfs snapshot data/pkg@pkg
+	
+	cp ${nginx_conf_dir}/snap.conf ${nginx_conf_dir}/pkg.conf
+
+	service nginx reload
+}
+
+
+complate_sync(){
+	cp ${nginx_conf_dir}/normal.conf ${nginx_conf_dir}/pkg.conf
+	
+	service nginx reload
+
+	datasize=`zfs list -t snapshot | grep pkg | awk '{print $2}'`
+
+	zfs destroy -f data/pkg@pkg
+}
+
+
+
+
+start(){
+	echo "`date '+%Y-%m-%d %H:%M:%S'` start sync pkg" >> $fetchpkglog
+
+	snap_and_chang_nginx
+
+	sync_pkg && sync_pkg
+	
+	complate_sync
+
+	echo "`date '+%Y-%m-%d %H:%M:%S'` complate sync pkg, syncd size:  $datasize"  >> $fetchpkglog
+}
+
+start 

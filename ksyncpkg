@@ -1,0 +1,4 @@
+#!/bin/sh
+kill `ps aux | grep syncpkg | awk '{print $2}'`
+kill `ps aux | grep pkg-mirror | awk '{print $2}'`
+kill `ps aux | grep curl | awk '{print $2}'`
